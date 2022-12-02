@@ -5,10 +5,15 @@ from tqdm import tqdm
 import argparse
 
 parser = argparse.ArgumentParser(description='Plot a series of 2D displacement maps along a given scan and projection direction')
+parser.add_argument('inputDirs', nargs='+',
+                    help="input displacement selection")
 parser.add_argument('-p', '--projection',
                     help="Which direction of displacement to plot ('x', 'y', 'z')")
 parser.add_argument('-s', '--scan',
                     help="Which axis to scan ('x', 'y', 'z')")
+parser.add_argument('-w', '--useWeights',
+                    action = 'store_true',
+                    help="use axial/radial weighting")
 parser.add_argument('-o', '--output',
                     default = 'cathode_crosser_volume_plots',
                     help='output directory')
@@ -43,13 +48,18 @@ bins = {'x': np.linspace(-300, 300, 31),
 
 histkwargs = {'bins': (bins['x'], bins['y'], bins['z'])}
 
-# inputDir = './cathode_crossers_volumetric_module0_502'
+# example of input dirs
+# now just handled as an arg
 # inputDirs = ['./cathode_crossers_volumetric_module0',
 #              './cathode_crossers_volumetric_module0_502',
 #              ]
-inputDirs = ['./cathode_crossers_volumetric']
+# inputDirs = ['./cathode_crossers_volumetric']
+if args.inputDirs == None:
+    args.inputDirs = ['./cathode_crossers_volumetric']
+
+print("input", args.inputDirs)
 infileList = [os.path.join(inputDir, infile)
-              for inputDir in inputDirs
+              for inputDir in args.inputDirs
               for infile in os.listdir(inputDir)
               ]
 
@@ -76,27 +86,25 @@ for path in tqdm(infileList):
     pca_dir = np.load(path)[2]
     if np.any(reco):
         ds = np.diff(np.array([true, reco]) , axis = 0)[0]
-        sigma = np.sqrt(np.power(np.dot(pca_dir,
-                                        unit_vectors[projection])
-                                 * sigma_axial, 2)
-                        + np.power(np.linalg.norm(np.cross(pca_dir,
-                                                           unit_vectors[projection]),
-                                                  axis = -1)
-                                   * sigma_radial, 2))
-        # sigma = np.ones(ds.shape[0]) # unweighted
+        if args.useWeights:
+            sigma = np.sqrt(np.power(np.dot(pca_dir,
+                                            unit_vectors[projection])
+                                     * sigma_axial, 2)
+                            + np.power(np.linalg.norm(np.cross(pca_dir,
+                                                               unit_vectors[projection]),
+                                                      axis = -1)
+                                       * sigma_radial, 2))
+        else:
+            sigma = np.ones(ds.shape[0]) # unweighted
+
         displacement_proj = np.dot(ds, unit_vectors[projection])
 
         denom_hist += np.histogramdd(reco,
                                      weights = 1./sigma,
                                      **histkwargs)[0]
-        # denom_hist += np.histogramdd(reco,
-        #                              **histkwargs)[0]
         disp_hist += np.histogramdd(reco,
                                     weights = displacement_proj/sigma,
                                     **histkwargs)[0]
-        # disp_hist += np.histogramdd(reco,
-        #                             weights = displacement_proj,
-        #                             **histkwargs)[0]
         occ_hist += np.histogramdd(reco,
                                    **histkwargs)[0]
 
@@ -148,7 +156,8 @@ for i, binCenter in enumerate(scanBinCenters):
         # thisSlice = disp_std_combined[:,:,i].T
         # thisSlice = frac_error_combined[:,:,i].T
         # thisSlice = occ_hist[i,:,:]
-    
+
+    # use this cmap for diverging (zero-centered) quantities
     # plt.imshow(thisSlice,
     #            origin = 'lower',
     #            extent = (np.min(bins[plotAx[0]]),
@@ -158,22 +167,27 @@ for i, binCenter in enumerate(scanBinCenters):
     #            cmap = 'RdYlBu',
     #            vmin = vext,
     #            vmax = -vext)
+    # use this cmap for sequential quantities
     plt.imshow(thisSlice,
                origin = 'lower',
                extent = (np.min(bins[plotAx[0]]),
                          np.max(bins[plotAx[0]]),
                          np.min(bins[plotAx[1]]),
                          np.max(bins[plotAx[1]])))
+
     plt.xlabel(plotAx[0]+r' [mm]')
     plt.ylabel(plotAx[1]+r' [mm]')
     plt.title(scanDir+r' = '+str(binCenter)+ r' mm')
     plt.gca().set_aspect('equal')
     cb = plt.colorbar()
+
+    # set the title as you need
     # cb.set_label(r'$\Delta '+projection+r'$ [mm]')
     # cb.set_label(r'Occupancy')
     cb.set_label(r'$\sigma (\Delta '+projection+r'$) [mm]')
     plt.subplots_adjust(left=-0.9, bottom=0.125, right=1, top=0.9)
 
+    # you might decide to name the output file something meaningful
     # plt.savefig('cathode_crosser_volume_plots/delta_'+projection+'_slice_'+scanDir+'_'+str(binCenter)+'.png',
     #             dpi=300)
     # plt.savefig('cathode_crosser_volume_plots_module0/delta_'+projection+'_slice_'+scanDir+'_'+str(binCenter)+'.png',
