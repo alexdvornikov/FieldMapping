@@ -114,11 +114,10 @@ for path in tqdm(infileList):
 
 disp_mean = disp_hist/denom_hist
 disp_var = var_hist/denom_hist - np.power(disp_mean, 2)
-
+disp_std = np.sqrt(disp_var)
 
 # disp_std = np.sqrt((var_hist - np.power(disp_hist,2))/denom_hist)
 # disp_std = np.power(occ_hist, -1./2)
-disp_std = np.sqrt(disp_var)
 disp_std_stat = np.abs(disp_mean)*np.power(occ_hist, -0.5)
 
 disp_std_combined = np.sqrt(np.power(disp_std, 2) + 
@@ -129,51 +128,48 @@ frac_error_combined = disp_std_combined/disp_mean
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-nonNaN = disp_mean[~np.isnan(disp_mean)]
-vext = np.max([np.max(nonNaN), -np.min(nonNaN)])
 
+imshowKwargs = {"origin": 'lower',
+                "extent": (np.min(bins[plotAx[0]]),
+                           np.max(bins[plotAx[0]]),
+                           np.min(bins[plotAx[1]]),
+                           np.max(bins[plotAx[1]]))}
+
+# change this to make interesting things happen! (probably should be an arg)
+quantity = 'mean'
+if quantity == 'mean':
+    sliceHist = disp_mean
+    
+    nonNaN = disp_mean[~np.isnan(disp_mean)]
+    vext = np.max([np.max(nonNaN), -np.min(nonNaN)])
+
+    imshowKwargs.update({"cmap": 'RdYlBu',
+                         "vmin": vext,
+                         "vmax": -vext})
+if quantity == 'std':
+    sliceHist = disp_std
+if quantity == 'std_stat':
+    sliceHist = disp_std_stat
+if quantity == 'std_combined':
+    sliceHist = disp_std_combined
+if quantity == 'frac_err':
+    sliceHist = frac_error_combined
+if quantity == 'occ':
+    sliceHist = occ_hist
+    
 scanBinCenters = 0.5*(bins[scanDir][1:] + bins[scanDir][:-1])
 for i, binCenter in enumerate(scanBinCenters):
     fig = plt.figure()
     if scanDir == 'x':
-        # thisSlice = disp_mean[i,:,:]
-        thisSlice = disp_std[i,:,:]
-        # thisSlice = disp_std_stat[i,:,:]
-        # thisSlice = disp_std_combined[i,:,:]
-        # thisSlice = frac_error_combined[i,:,:]
-        # thisSlice = occ_hist[i,:,:]
+        thisSlice = sliceHist[i,:,:]
     elif scanDir == 'y':
-        # thisSlice = disp_mean[:,i,:].T
-        thisSlice = disp_std[:,i,:].T
-        # thisSlice = disp_std_stat[:,i,:].T
-        # thisSlice = disp_std_combined[:,i,:].T
-        # thisSlice = frac_error_combined[:,i,:].T
-        # thisSlice = occ_hist[i,:,:]
+        thisSlice = sliceHist[:,i,:].T
     elif scanDir == 'z':
-        # thisSlice = disp_mean[:,:,i].T
-        thisSlice = disp_std[:,:,i].T
-        # thisSlice = disp_std_stat[:,:,i].T
-        # thisSlice = disp_std_combined[:,:,i].T
-        # thisSlice = frac_error_combined[:,:,i].T
-        # thisSlice = occ_hist[i,:,:]
+        thisSlice = sliceHist[:,:,i].T
 
     # use this cmap for diverging (zero-centered) quantities
-    # plt.imshow(thisSlice,
-    #            origin = 'lower',
-    #            extent = (np.min(bins[plotAx[0]]),
-    #                      np.max(bins[plotAx[0]]),
-    #                      np.min(bins[plotAx[1]]),
-    #                      np.max(bins[plotAx[1]])),
-    #            cmap = 'RdYlBu',
-    #            vmin = vext,
-    #            vmax = -vext)
-    # use this cmap for sequential quantities
     plt.imshow(thisSlice,
-               origin = 'lower',
-               extent = (np.min(bins[plotAx[0]]),
-                         np.max(bins[plotAx[0]]),
-                         np.min(bins[plotAx[1]]),
-                         np.max(bins[plotAx[1]])))
+               **inshowKwargs)
 
     plt.xlabel(plotAx[0]+r' [mm]')
     plt.ylabel(plotAx[1]+r' [mm]')
@@ -188,16 +184,7 @@ for i, binCenter in enumerate(scanBinCenters):
     plt.subplots_adjust(left=-0.9, bottom=0.125, right=1, top=0.9)
 
     # you might decide to name the output file something meaningful
-    # plt.savefig('cathode_crosser_volume_plots/delta_'+projection+'_slice_'+scanDir+'_'+str(binCenter)+'.png',
-    #             dpi=300)
-    # plt.savefig('cathode_crosser_volume_plots_module0/delta_'+projection+'_slice_'+scanDir+'_'+str(binCenter)+'.png',
-    #             dpi=300)
-# \    plt.savefig('cathode_crosser_volume_plots_module0_502/delta_'+projection+'_slice_'+scanDir+'_'+str(binCenter)+'.png',
-#                 dpi=300)
-    # plt.savefig(os.path.join(args.output, 'delta_'+projection+'_slice_'+scanDir+'_'+str(binCenter)+'.png'),
-    plt.savefig(os.path.join(args.output, 'std_slice_'+scanDir+'_'+str(binCenter)+'.png'),
+    plt.savefig(os.path.join(args.output, quantity+'_slice_'+scanDir+'_'+str(binCenter)+'.png'),
                 dpi=300)
-    # plt.savefig(os.path.join(args.output, 'occupancy_slice_'+scanDir+'_'+str(binCenter)+'.png'),
-    #             dpi=300)
     # plt.show()
     plt.clf()
